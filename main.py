@@ -1,49 +1,59 @@
 import os
 import asyncio
-from telegram import Bot
 import pandas as pd
 import requests
-from datetime import datetime, timedelta
+from telegram import Bot
 
-symbols = {
-    "XAUUSD": "XAUUSD",
-    "EURUSD": "EURUSD",
-    "GBPJPY": "GBPJPY",
-    "BTCUSD": "BTCUSD",
-    "USDJPY": "USDJPY",
-    "US30": "US30"
-}
-
-timeframes = ["M5", "M15", "M30"]
 bot_token = os.getenv("BOT_TOKEN")
 chat_id = os.getenv("CHAT_ID")
+api_key = os.getenv("TWELVE_DATA_KEY")
+
+symbols = {
+    "XAUUSD": "XAU/USD",
+    "EURUSD": "EUR/USD",
+    "GBPJPY": "GBP/JPY",
+    "BTCUSD": "BTC/USD",
+    "USDJPY": "USD/JPY",
+    "US30": "DJI"
+}
+
+timeframes = {
+    "M5": "5min",
+    "M15": "15min",
+    "M30": "30min"
+}
+
 bot = Bot(token=bot_token)
 
 async def fetch_data(symbol, interval):
-    # Simulated dummy data (in real code you'd use an API)
-    df = pd.DataFrame({
-        "close": [1.2300, 1.2320, 1.2340, 1.2360, 1.2380, 1.2400],
-    })
-    return df
+    url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval={interval}&outputsize=6&apikey={api_key}"
+    response = requests.get(url)
+    data = response.json()
+    if "values" not in data:
+        return None
+    df = pd.DataFrame(data["values"])
+    df["close"] = df["close"].astype(float)
+    return df[::-1]  # reverse to ascending order
 
 def calculate_signal(df):
-    if len(df) < 6:
+    if df is None or len(df) < 6:
         return None
-    last_close = df["close"].iloc[-1]
-    prev_close = df["close"].iloc[-2]
-    if last_close > prev_close:
-        return "buy"
-    elif last_close < prev_close:
-        return "sell"
+    last = df["close"].iloc[-1]
+    prev = df["close"].iloc[-2]
+    if last > prev:
+        return "BUY"
+    elif last < prev:
+        return "SELL"
     return None
 
 async def analyze_market():
-    for symbol in symbols:
-        for tf in timeframes:
-            df = await fetch_data(symbol, tf)
+    for symbol_key, symbol in symbols.items():
+        for tf_key, tf_val in timeframes.items():
+            df = await asyncio.to_thread(fetch_data, symbol, tf_val)
             signal = calculate_signal(df)
             if signal:
-                text = f"📊 Signal for {symbol} on {tf} timeframe\nAction: {signal.upper()}\nEntry: {df['close'].iloc[-1]}"
+                entry = df["close"].iloc[-1]
+                text = f"📈 Signal for {symbol_key} on {tf_key} timeframe\nAction: {signal}\nEntry: {entry}"
                 await bot.send_message(chat_id=chat_id, text=text)
 
 asyncio.run(analyze_market())
