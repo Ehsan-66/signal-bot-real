@@ -49,7 +49,7 @@ def calculate_signal(df):
 async def analyze_market():
     for symbol_key, symbol in symbols.items():
         for tf_key, tf_val in timeframes.items():
-            df = await asyncio.to_thread(fetch_data, symbol, tf_val)
+            df = await fetch_data(symbol, tf_val)
             signal = calculate_signal(df)
             if signal:
                 entry = df["close"].iloc[-1]
