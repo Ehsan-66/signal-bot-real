@@ -1,3 +1,5 @@
+python-telegram-bot==20.6
 pandas
 requests
-python-telegram-bot
+tqdm
+ta
